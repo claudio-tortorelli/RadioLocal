@@ -33,27 +33,30 @@ public class GlobalHotkeyManager implements NativeKeyListener {
         this.service = service;
         try {
             /* Disattiva i log di JNativeHook (troppi) */
-            java.util.logging.Logger logger = java.util.logging.Logger
-                    .getLogger(GlobalScreen.class.getPackage().getName());
+            java.util.logging.Logger logger = java.util.logging.Logger.getLogger(GlobalScreen.class.getPackage().getName());
             logger.setLevel(Level.OFF);
 
             GlobalScreen.registerNativeHook();
             GlobalScreen.addNativeKeyListener(this);
             LOG.info("Hot key globali attivati");
 
-            /* Log delle hot‑key disponibili */
-            LOG.info("=== Hot key disponibili (prefisso ESC o Ctrl+Shift) ===");
-            LOG.info("  ESC + Up     -> volume +%s".formatted(config.get("setup", "volumeStep", "5")));
-            LOG.info("  ESC + Down   -> volume -%s".formatted(config.get("setup", "volumeStep", "5")));
-            LOG.info("  ESC + Right  -> brano successivo");
-            LOG.info("  ESC + Left   -> brano precedente");
-            LOG.info("  ESC + P   -> pause / riprendi");
-            LOG.info("  ESC + I   -> informazioni / stato corrente");
-            LOG.info("  ESC + H   -> visualizza questo help");
-            LOG.info("  ESC x2    -> exit (due volte)");
+            printHotKeys();
         } catch (NativeHookException e) {
             LOG.error("Impossibile registrare il native hook", e);
         }
+    }
+
+    public static void printHotKeys() {
+        /* Log delle hot‑key disponibili */
+        LOG.info("=== Hot key disponibili (prefisso ESC o Ctrl+Shift) ===");
+        LOG.info("  ESC + Up     -> volume +");
+        LOG.info("  ESC + Down   -> volume -");
+        LOG.info("  ESC + Right  -> brano successivo");
+        LOG.info("  ESC + Left   -> brano precedente");
+        LOG.info("  ESC + P   -> pause / riprendi");
+        LOG.info("  ESC + I   -> informazioni / stato corrente");
+        LOG.info("  ESC + H   -> visualizza questo help");
+        LOG.info("  ESC + Q   -> exit");
     }
 
     /* --------------------------------------------------------------
@@ -98,10 +101,7 @@ public class GlobalHotkeyManager implements NativeKeyListener {
          *-----------------------------------------------------------*/
         if (ev.getKeyCode() == NativeKeyEvent.VC_ESCAPE) {
             escPressed = false;
-            if (!escComboUsed) {
-                LOG.debug("ESC rilasciato senza combinazione -> azione singola");
-                service.handleEsc();               // stop / exit
-            } else {
+            if (escComboUsed) {
                 LOG.debug("ESC rilasciato dopo combinazione -> nessuna azione singola");
             }
         }
@@ -148,10 +148,10 @@ public class GlobalHotkeyManager implements NativeKeyListener {
             }
             case NativeKeyEvent.VC_H -> {
                 LOG.debug("Hot‑key: ESC+H -> help");
-                service.printHelp();
+                printHotKeys();
             }
-            case NativeKeyEvent.VC_ESCAPE -> {
-                LOG.debug("Hot‑key: ESC+ESC -> stop immediato");
+            case NativeKeyEvent.VC_Q -> {
+                LOG.debug("Hot‑key: ESC+Q -> Quit");
                 service.handleEsc();
             }
         }

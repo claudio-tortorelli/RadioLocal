@@ -115,10 +115,11 @@ public class RadioStationService {
                 updateTray("In riproduzione: " + track.getArtist() + " – " + track.getTitle());
                 showBalloon(track);
 
-                LOG.info("-- RIPRODOTTO: %s | %s (%s)"
-                        .formatted(track.getArtist(), track.getTitle(), track.getAlbum()));
+                LOG.info("-- RIPRODOTTO: %s | %s (%s)".formatted(track.getArtist(), track.getTitle(), track.getAlbum()));
 
-                speaker.speak("%s in %s".formatted(track.getArtist(), track.getTitle()));
+                if (speaker != null) {
+                    speaker.speak("%s in %s".formatted(track.getArtist(), track.getTitle()));
+                }
 
                 player.play(track);
 
@@ -191,28 +192,8 @@ public class RadioStationService {
     }
 
     public void handleEsc() {
-        long now = System.currentTimeMillis();
-        if (now - lastEsc.get() < 1000) {
-            LOG.info("Doppio ESC -> chiusura");
-            shutdown();
-        } else {
-            LOG.info("ESC -> stop brano corrente");
-            player.stop();
-            lastEsc.set(now);
-        }
-    }
-
-    public void printHelp() throws CTException {
-        LOG.info("=== Hot key disponibili (prefisso ESC o Ctrl+Shift) ===");
-        LOG.info("  ESC + Up     -> volume +%s".formatted(config.get("setup", "volumeStep", "5")));
-        LOG.info("  ESC + Down   -> volume -%s".formatted(config.get("setup", "volumeStep", "5")));
-        LOG.info("  ESC + Right  -> brano successivo");
-        LOG.info("  ESC + Left   -> brano precedente");
-        LOG.info("  ESC + P      -> pausa/riprendi");
-        LOG.info("  ESC + I      -> informazioni / stato corrente");
-        LOG.info("  ESC + H      -> visualizza questo help");
-        LOG.info("  ESC          -> stop (una volta) / exit (due volte)");
-        LOG.info(" (in alternativa è possibile usare Ctrl+Shift+<tasto>)");
+        LOG.info("ESC + Q -> chiusura");
+        shutdown();
     }
 
     public void info() {

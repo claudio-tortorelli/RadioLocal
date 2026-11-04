@@ -11,6 +11,7 @@ import claudiosoft.radiolocal.player.JavaSoundAudioPlayer;
 import claudiosoft.radiolocal.player.PlaylistManager;
 import claudiosoft.radiolocal.scanner.LibraryScanner;
 import claudiosoft.radiolocal.service.RadioStationService;
+import claudiosoft.radiolocal.speaker.EspeakSpeaker;
 import claudiosoft.radiolocal.speaker.MarySpeaker;
 import claudiosoft.radiolocal.speaker.SpeakerEngine;
 import claudiosoft.radiolocal.tray.TrayIconManager;
@@ -38,7 +39,7 @@ public class RadioLocal {
         LogLevel logLevel = LogLevel.valueOf(radioConfig.get("logger", "level", "NORMAL"));
         Radio.logger = BasicLogger.get(logLevel, "RadioLocal", logFile);
 
-        Path rootPath = new File(radioConfig.get("library", "root")).toPath();
+        Path rootPath = new File(radioConfig.get("main", "root")).toPath();
         LibraryScanner scanner = new LibraryScanner(rootPath);
         Library library = scanner.scan();
 
@@ -48,7 +49,16 @@ public class RadioLocal {
 
         AudioPlayer player = new JavaSoundAudioPlayer();
 
-        SpeakerEngine speaker = new MarySpeaker(player, radioConfig);
+        SpeakerEngine speaker = null;
+        boolean enableSpeaker = radioConfig.get("main", "enableSpeaker", "true").equalsIgnoreCase("true");
+        if (enableSpeaker) {
+            String speakerType = radioConfig.get("main", "speakerType", "marytts");
+            if (speakerType.equalsIgnoreCase("marytts")) {
+                speaker = new MarySpeaker(player, radioConfig);
+            } else if (speakerType.equalsIgnoreCase("espeak")) {
+                speaker = new EspeakSpeaker(player, radioConfig);
+            }
+        }
 
         RadioStationService service = new RadioStationService(radioConfig, playlist, player, speaker, trayManager, library);
         service.start();
@@ -58,12 +68,15 @@ public class RadioLocal {
             dlg.setVisible(true);
         }));
 
-        GlobalHotkeyManager hotkeyManager = new GlobalHotkeyManager(service, radioConfig);
+        boolean enableHotKeys = radioConfig.get("main", "enableHotKeys", "true").equalsIgnoreCase("true");
+        if (enableHotKeys) {
+            GlobalHotkeyManager hotkeyManager = new GlobalHotkeyManager(service, radioConfig);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            Radio.logger.info("Chiusura dell'applicazione, rimozione hot key e shutdown servizio");
-            hotkeyManager.shutdown();
-        }));
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                Radio.logger.info("Chiusura dell'applicazione, rimozione hot key e shutdown servizio");
+                hotkeyManager.shutdown();
+            }));
+        }
 
         try {
             Thread.currentThread().join();          // blocca il thread principale

@@ -103,29 +103,58 @@ La configurazione avviene tramite il file `radiolocal.cfg`.
 ### Esempio di `radiolocal.cfg`
 
 ```properties
-# --- Setup Generali ---
-setup = true
-StartVolume = 50
-volumeStep = 5
+# -------------------------------------------------
+#  Main
+# -------------------------------------------------
+[main]
+root=E:\Music
+enableSpeaker=true
+speakerType=marytts
+enableHotKeys=true
 
-# --- Libreria ---
-library = root
-library_root = C:\Music
-# Oppure /Musica su Linux/Mac
+# -------------------------------------------------
+#  Logger
+# -------------------------------------------------
+[logger]
+file=radiolocal.log
+level=NORMAL
 
-# --- TTS ---
-marytts = true
-marytts.voice = dfki-poppy
-espeak = false
-espeak.path = C:\espeak
-espeak.voice = it+f2
-espeak.speed = 130
+# -------------------------------------------------
+#  TTS –  eSpeak (locale, binario “light”)
+# -------------------------------------------------
+[espeak]
+# Percorso assoluto o relativo dell’eseguibile espeak (se non è nel PATH)
+path = "C:\Program Files\eSpeak NG\espeak-ng.exe"
 
-# --- API ---
-announcements = true
-marytts.lang = it
-api.key = OPENWEATHER_KEY
-api.news_key = NEWS_KEY
+# Voce da usare (it, en-us, …). Il formato è quello di eSpeak:
+#   <lang>+<variant>   (es. it+f2 = voce femminile italiana)
+voice = it+f2
+
+# Velocità parole (default 130; valori 80‑450)
+speed = 130
+
+# -------------------------------------------------
+#  TTS –  MaryTTS (server locale HTTP)
+# -------------------------------------------------
+[marytts]
+# URL del server MaryTTS (di default è il server che parte con “java -jar marytts-5.2.jar”)
+url = http://localhost:59125/process
+
+# Voce da usare (es. it_IT+marc oppure en_US+alan)
+voice = istc-lucia-hsmm
+
+# Tipo di output (WAVE_FILE è quello più semplice da riprodurre)
+output = audio/WAVE_FILE
+
+
+# -----------------------------------------------------------------
+#  Meteo (OpenWeatherMap)
+# -----------------------------------------------------------------
+[weather]
+enabled = true
+location = Arezzo,IT          
+apiKey = ***********************
+
 ```
 
 ### Avvio
