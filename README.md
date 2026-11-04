@@ -107,17 +107,21 @@ La configurazione avviene tramite il file `radiolocal.cfg`.
 #  Main
 # -------------------------------------------------
 [main]
-root=E:\Music
-enableSpeaker=true
-speakerType=marytts
-enableHotKeys=true
+root = E:\Music
+ 
+startVolume = 50
+volumeStep = 5
+
+enableSpeaker = true
+speakerType = marytts
+enableHotKeys = true
 
 # -------------------------------------------------
 #  Logger
 # -------------------------------------------------
 [logger]
-file=radiolocal.log
-level=NORMAL
+file = radiolocal.log
+level = NORMAL
 
 # -------------------------------------------------
 #  TTS –  eSpeak (locale, binario “light”)
@@ -148,12 +152,30 @@ output = audio/WAVE_FILE
 
 
 # -----------------------------------------------------------------
+#  Global announcements
+# -----------------------------------------------------------------
+global_min_interval = 600
+
+# -----------------------------------------------------------------
 #  Meteo (OpenWeatherMap)
 # -----------------------------------------------------------------
 [weather]
 enabled = true
 location = Arezzo,IT          
-apiKey = ***********************
+apiKey = ************
+interval = 3600
+
+# -----------------------------------------------------------------
+#  Artist info
+# -----------------------------------------------------------------
+[artist]
+enabled = false
+
+# -----------------------------------------------------------------
+#  News
+# -----------------------------------------------------------------
+[news]
+enabled = false
 
 ```
 

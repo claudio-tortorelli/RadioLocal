@@ -14,12 +14,19 @@ import claudiosoft.radiolocal.service.RadioStationService;
 import claudiosoft.radiolocal.speaker.EspeakSpeaker;
 import claudiosoft.radiolocal.speaker.MarySpeaker;
 import claudiosoft.radiolocal.speaker.SpeakerEngine;
+import claudiosoft.radiolocal.speaker.announcement.AnnouncementEngine;
+import claudiosoft.radiolocal.speaker.announcement.AnnouncementProvider;
+import claudiosoft.radiolocal.speaker.announcement.ArtistInfoProvider;
+import claudiosoft.radiolocal.speaker.announcement.NewsProvider;
+import claudiosoft.radiolocal.speaker.announcement.WeatherProvider;
 import claudiosoft.radiolocal.tray.TrayIconManager;
 import claudiosoft.radiolocal.ui.RequestDialog;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.SwingUtilities;
 import marytts.exceptions.MaryConfigurationException;
 
@@ -60,7 +67,39 @@ public class RadioLocal {
             }
         }
 
-        RadioStationService service = new RadioStationService(radioConfig, playlist, player, speaker, trayManager, library);
+        List<AnnouncementProvider> providers = new ArrayList<>();
+
+        // Weather
+        boolean enableWeatherAnnouncements = radioConfig.get("weather", "enabled", "true").equalsIgnoreCase("true");
+        if (enableWeatherAnnouncements) {
+            providers.add(new WeatherProvider(
+                    radioConfig.get("weather", "apiKey", ""),
+                    radioConfig.get("weather", "location", "Roma,IT"),
+                    radioConfig.getLong("weather", "interval", "3600")
+            ));
+        }
+
+        // Artist Info
+        boolean enableArtistAnnouncements = radioConfig.get("artist", "enabled", "true").equalsIgnoreCase("true");
+        if (enableArtistAnnouncements) {
+            providers.add(new ArtistInfoProvider(
+                    radioConfig.getLong("announcements", "artist_ttl", "3600")
+            ));
+        }
+
+        // News
+        boolean enableNewsAnnouncements = radioConfig.get("news", "enabled", "true").equalsIgnoreCase("true");
+        if (enableNewsAnnouncements) {
+            providers.add(new NewsProvider(
+                    radioConfig.get("announcements", "news_api_key", ""),
+                    radioConfig.getLong("announcements", "news_interval", "3600")
+            ));
+        }
+
+        long globalMinInterval = radioConfig.getLong("announcements", "global_min_interval", "600");
+        AnnouncementEngine announcementEngine = new AnnouncementEngine(providers, globalMinInterval);
+
+        RadioStationService service = new RadioStationService(radioConfig, playlist, player, speaker, trayManager, library, announcementEngine);
         service.start();
 
         trayManager.addMenuItem("Richiesta", e -> SwingUtilities.invokeLater(() -> {

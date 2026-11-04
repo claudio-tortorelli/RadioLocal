@@ -9,9 +9,11 @@ import claudiosoft.radiolocal.model.Track;
 import claudiosoft.radiolocal.player.AudioPlayer;
 import claudiosoft.radiolocal.player.PlaylistManager;
 import claudiosoft.radiolocal.speaker.SpeakerEngine;
+import claudiosoft.radiolocal.speaker.announcement.*;
 import claudiosoft.radiolocal.tray.TrayIconManager;
 import java.awt.EventQueue;
 import java.awt.TrayIcon;
+import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -32,7 +34,7 @@ public class RadioStationService {
     private final TrayIconManager tray;
     private final Library library;                       // *** nuova ***
     private final BlockingQueue<Track> requestQueue = new LinkedBlockingQueue<>(); // *** nuova ***
-
+    private final AnnouncementEngine announcementEngine;
     private final ExecutorService exec = Executors.newSingleThreadExecutor();
 
     /* -------------------------------------------------------------
@@ -46,27 +48,28 @@ public class RadioStationService {
     // 1) costruttore legacy (senza tray e senza library)
     public RadioStationService(Config config, PlaylistManager pl,
             AudioPlayer plr, SpeakerEngine speaker) throws CTException {
-        this(config, pl, plr, speaker, null, null);
+        this(config, pl, plr, speaker, null, null, null);
     }
 
     // 2) costruttore con tray ma senza library
     public RadioStationService(Config config, PlaylistManager pl,
             AudioPlayer plr, SpeakerEngine speaker,
             TrayIconManager tr) throws CTException {
-        this(config, pl, plr, speaker, tr, null);
+        this(config, pl, plr, speaker, tr, null, null);
     }
 
     // 3) costruttore completo (inclusa la Library)
     public RadioStationService(Config config, PlaylistManager pl,
             AudioPlayer plr, SpeakerEngine speaker,
-            TrayIconManager tr, Library lib) throws CTException {
+            TrayIconManager tr, Library lib, AnnouncementEngine engine) throws CTException {
         this.config = config;
         this.playlist = pl;
         this.player = plr;
-        this.speaker = speaker;
+        this.speaker = speaker; // può essere null (senza funzionalità richiesta)
         this.tray = tr;
-        this.library = lib;                         // può essere null (senza funzionalità richiesta)
-        this.player.setVolume(config.getInt("setup", "StartVolume", "50"));
+        this.library = lib;
+        this.announcementEngine = engine; // può essere null (senza funzionalità richiesta)
+        this.player.setVolume(config.getInt("main", "startVolume", "50"));
     }
 
     /* ------------------- Interfaccia per le richieste ------------------- */
@@ -117,6 +120,18 @@ public class RadioStationService {
 
                 LOG.info("-- RIPRODOTTO: %s | %s (%s)".formatted(track.getArtist(), track.getTitle(), track.getAlbum()));
 
+                if (announcementEngine != null && speaker != null) {
+                    Optional<String> announcement = announcementEngine.maybeGenerate(track);
+                    if (announcement.isPresent()) {
+                        LOG.info("Generato annuncio automatico: " + announcement.get());
+                        speaker.speak(announcement.get());
+                        // Attendiamo che l'annuncio finisca prima di partire con la musica
+                        while (player.isPlaying()) {
+                            Thread.sleep(100);
+                        }
+                    }
+                }
+
                 if (speaker != null) {
                     speaker.speak("%s in %s".formatted(track.getArtist(), track.getTitle()));
                 }
@@ -155,15 +170,13 @@ public class RadioStationService {
 
     /* ------------------- Controlli hot‑key ------------------- */
     public void increaseVolume() throws CTException {
-        int vol = Math.min(100,
-                player.getVolume() + config.getInt("setup", "volumeStep", "5"));
+        int vol = Math.min(100, player.getVolume() + config.getInt("main", "volumeStep", "5"));
         player.setVolume(vol);
         LOG.info("volume is %d".formatted(vol));
     }
 
     public void decreaseVolume() throws CTException {
-        int vol = Math.max(0,
-                player.getVolume() - config.getInt("setup", "volumeStep", "5"));
+        int vol = Math.max(0, player.getVolume() - config.getInt("main", "volumeStep", "5"));
         player.setVolume(vol);
         LOG.info("volume is %d".formatted(vol));
     }
@@ -198,6 +211,31 @@ public class RadioStationService {
 
     public void info() {
         // eventuali dati di stato da mostrare
+    }
+
+    public void forceWeather() {
+        triggerForcedAnnouncement(WeatherProvider.class);
+    }
+
+    public void forceArtistInfo() {
+        triggerForcedAnnouncement(ArtistInfoProvider.class);
+    }
+
+    public void forceNews() {
+        triggerForcedAnnouncement(NewsProvider.class);
+    }
+
+    private void triggerForcedAnnouncement(Class<? extends AnnouncementProvider> providerClass) {
+        if (announcementEngine == null || speaker == null) {
+            return;
+        }
+
+        // Recuperiamo la traccia corrente dal player (se possibile) o dalla playlist
+        Track current = playlist.current();
+        announcementEngine.forceAnnouncement(providerClass, current).ifPresent(text -> {
+            LOG.info("Annuncio forzato via hotkey: " + text);
+            speaker.speak(text);
+        });
     }
 
     public void showWindow() {

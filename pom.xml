@@ -63,7 +63,7 @@
         <dependency>
             <groupId>claudiosoft</groupId>
             <artifactId>CTUtils</artifactId>
-            <version>1.0.1</version>
+            <version>1.0.2</version>
         </dependency>
 
         <!--JNativeHook – hot‑key globali--> 

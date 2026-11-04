@@ -60,6 +60,13 @@ public class AnnouncementEngine {
         return maybeText;
     }
 
+    public Optional<String> forceAnnouncement(Class<? extends AnnouncementProvider> providerClass, Track currentTrack) {
+        return providers.stream()
+                .filter(providerClass::isInstance)
+                .findFirst()
+                .flatMap(p -> p.getAnnouncement(currentTrack));
+    }
+
     /**
      * Metodo di clean‑up da chiamare al shutdown della radio
      */

@@ -48,13 +48,16 @@ public class GlobalHotkeyManager implements NativeKeyListener {
 
     public static void printHotKeys() {
         /* Log delle hot‑key disponibili */
-        LOG.info("=== Hot key disponibili (prefisso ESC o Ctrl+Shift) ===");
+        LOG.info("=== Hot key disponibili (prefisso ESC) ===");
         LOG.info("  ESC + Up     -> volume +");
         LOG.info("  ESC + Down   -> volume -");
         LOG.info("  ESC + Right  -> brano successivo");
         LOG.info("  ESC + Left   -> brano precedente");
-        LOG.info("  ESC + P   -> pause / riprendi");
+        LOG.info("  ESC + P   -> pausa / riprendi");
         LOG.info("  ESC + I   -> informazioni / stato corrente");
+        LOG.info("  ESC + W   -> forza meteo");
+        LOG.info("  ESC + A   -> forza info artista");
+        LOG.info("  ESC + N   -> forza news");
         LOG.info("  ESC + H   -> visualizza questo help");
         LOG.info("  ESC + Q   -> exit");
     }
@@ -153,6 +156,18 @@ public class GlobalHotkeyManager implements NativeKeyListener {
             case NativeKeyEvent.VC_Q -> {
                 LOG.debug("Hot‑key: ESC+Q -> Quit");
                 service.handleEsc();
+            }
+            case NativeKeyEvent.VC_W -> {
+                LOG.debug("Hot‑key: ESC+W -> Forza Meteo");
+                service.forceWeather();
+            }
+            case NativeKeyEvent.VC_A -> {
+                LOG.debug("Hot‑key: ESC+A -> Forza Info Artista");
+                service.forceArtistInfo();
+            }
+            case NativeKeyEvent.VC_N -> {
+                LOG.debug("Hot‑key: ESC+N -> Forza News");
+                service.forceNews();
             }
         }
     }
