@@ -63,14 +63,8 @@ public class TrayIconManager {
             ti = new TrayIcon(img);
             ti.setImageAutoSize(true);
 
-            // 3) popup menu (con voce “Esci” di base)
+            // 3) popup menu (RIMOSSO l'aggiunta automatica di "Esci")
             popup = new PopupMenu();
-            MenuItem exitItem = new MenuItem("Esci");
-            exitItem.addActionListener(e -> {
-                LOG.info("Richiesta di chiusura dalla TrayIcon");
-                System.exit(0);
-            });
-            popup.add(exitItem);
             ti.setPopupMenu(popup);
 
             // 4) aggiunta al system tray

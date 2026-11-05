@@ -116,7 +116,11 @@ public class RadioStationService {
                  * Aggiornamento UI della System‑Tray
                  * ------------------------------------------------- */
                 updateTray("In riproduzione: " + track.getArtist() + " – " + track.getTitle());
-                showBalloon(track);
+                try {
+                    showBalloon(track);
+                } catch (CTException ex) {
+
+                }
 
                 LOG.info("-- RIPRODOTTO: %s | %s (%s)".formatted(track.getArtist(), track.getTitle(), track.getAlbum()));
 
@@ -153,7 +157,11 @@ public class RadioStationService {
     }
 
     /* ------------------- UI Tray ------------------- */
-    private void showBalloon(Track track) {
+    private void showBalloon(Track track) throws CTException {
+        boolean show = config.get("main", "showBalloon", "true").equalsIgnoreCase("true");
+        if (!show) {
+            return;
+        }
         if (tray != null) {
             final String title = track.getTitle();
             final String msg = "Artist: " + track.getArtist();

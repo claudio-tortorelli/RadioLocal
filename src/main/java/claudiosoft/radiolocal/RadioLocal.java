@@ -36,94 +36,247 @@ import marytts.exceptions.MaryConfigurationException;
  */
 public class RadioLocal {
 
+    // --- Componenti Statiche Globali ---
     public static BasicLogger logger;
+    private static Config config;
+    private static Library library;
+    private static PlaylistManager playlist;
+    private static TrayIconManager trayManager;
+    private static AudioPlayer player;
+    private static SpeakerEngine speaker;
+    private static AnnouncementEngine announcementEngine;
+    private static RadioStationService service;
 
-    public static void main(String[] args) throws CTException, IOException, SQLException, MaryConfigurationException {
+    public static void main(String[] args) {
+        try {
+            System.setProperty("java.awt.headless", "false");
 
-        System.setProperty("java.awt.headless", "false");
+            // Inizializzazione di tutti i componenti
+            init();
 
-        Config radioConfig = new Config(new File("radiolocal.cfg"), false);
+            // Avvio del servizio radio
+            service.start();
 
-        File logFile = new File(radioConfig.get("logger", "file", "radiolocal.log"));
-        LogLevel logLevel = LogLevel.valueOf(radioConfig.get("logger", "level", "NORMAL"));
+            // Configurazione Menu System Tray
+            addSystemTrayMenu();
+
+            // Gestione HotKeys
+            setupHotKeys();
+
+            // Blocca il thread principale per mantenere l'app attiva
+            Thread.currentThread().join();
+
+        } catch (CTException | IOException | SQLException | MaryConfigurationException e) {
+            // Se il logger è già attivo, lo usiamo, altrimenti usiamo l'err standard
+            if (logger != null) {
+                logger.error("Errore fatale durante l'avvio dell'applicazione", e);
+            } else {
+                e.printStackTrace();
+            }
+            System.exit(1);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Metodo di inizializzazione che istanzia tutte le dipendenze del progetto.
+     */
+    private static void init() throws CTException, IOException, SQLException, MaryConfigurationException {
+        // 1. Configurazione e Logger
+        config = new Config(new File("radiolocal.cfg"), false);
+        File logFile = new File(config.get("logger", "file", "radiolocal.log"));
+        LogLevel logLevel = LogLevel.valueOf(config.get("logger", "level", "NORMAL"));
         logger = BasicLogger.get(logLevel, "RadioLocal", logFile);
 
-        Path rootPath = new File(radioConfig.get("main", "root")).toPath();
+        // 2. Libreria e Playlist
+        Path rootPath = new File(config.get("main", "root")).toPath();
         LibraryScanner scanner = new LibraryScanner(rootPath);
-        Library library = scanner.scan();
+        library = scanner.scan();
+        playlist = new PlaylistManager(library.getAllTracks());
 
-        PlaylistManager playlist = new PlaylistManager(library.getAllTracks());
+        // 3. UI e Audio
+        trayManager = new TrayIconManager();
+        player = new JavaSoundAudioPlayer();
 
-        TrayIconManager trayManager = new TrayIconManager();
-
-        AudioPlayer player = new JavaSoundAudioPlayer();
-
-        SpeakerEngine speaker = null;
-        boolean enableSpeaker = radioConfig.get("main", "enableSpeaker", "true").equalsIgnoreCase("true");
+        // 4. Speaker TTS (MaryTTS o eSpeak)
+        boolean enableSpeaker = config.get("main", "enableSpeaker", "true").equalsIgnoreCase("true");
         if (enableSpeaker) {
-            String speakerType = radioConfig.get("main", "speakerType", "marytts");
+            String speakerType = config.get("main", "speakerType", "marytts");
             if (speakerType.equalsIgnoreCase("marytts")) {
-                speaker = new MarySpeaker(player, radioConfig);
+                speaker = new MarySpeaker(player, config);
             } else if (speakerType.equalsIgnoreCase("espeak")) {
-                speaker = new EspeakSpeaker(player, radioConfig);
+                speaker = new EspeakSpeaker(player, config);
             }
         }
 
+        // 5. Motore Annunci
         List<AnnouncementProvider> providers = new ArrayList<>();
 
-        // Weather
-        boolean enableWeatherAnnouncements = radioConfig.get("weather", "enabled", "true").equalsIgnoreCase("true");
-        if (enableWeatherAnnouncements) {
+        if (config.get("weather", "enabled", "true").equalsIgnoreCase("true")) {
             providers.add(new WeatherProvider(
-                    radioConfig.get("weather", "apiKey", ""),
-                    radioConfig.get("weather", "location", "Roma,IT"),
-                    radioConfig.getLong("weather", "interval", "3600")
+                    config.get("weather", "apiKey", ""),
+                    config.get("weather", "location", "Roma,IT"),
+                    config.getLong("weather", "interval", "3600")
             ));
         }
 
-        // Artist Info
-        boolean enableArtistAnnouncements = radioConfig.get("artist", "enabled", "true").equalsIgnoreCase("true");
-        if (enableArtistAnnouncements) {
+        if (config.get("artist", "enabled", "true").equalsIgnoreCase("true")) {
             providers.add(new ArtistInfoProvider(
-                    radioConfig.getLong("announcements", "artist_ttl", "3600")
+                    config.getLong("announcements", "artist_ttl", "3600")
             ));
         }
 
-        // News
-        boolean enableNewsAnnouncements = radioConfig.get("news", "enabled", "true").equalsIgnoreCase("true");
-        if (enableNewsAnnouncements) {
+        if (config.get("news", "enabled", "true").equalsIgnoreCase("true")) {
             providers.add(new NewsProvider(
-                    radioConfig.get("announcements", "news_api_key", ""),
-                    radioConfig.getLong("announcements", "news_interval", "3600")
+                    config.get("announcements", "news_api_key", ""),
+                    config.getLong("announcements", "news_interval", "3600")
             ));
         }
 
-        long globalMinInterval = radioConfig.getLong("announcements", "global_min_interval", "600");
-        AnnouncementEngine announcementEngine = new AnnouncementEngine(providers, globalMinInterval);
+        long globalMinInterval = config.getLong("announcements", "global_min_interval", "600");
+        announcementEngine = new AnnouncementEngine(providers, globalMinInterval);
 
-        RadioStationService service = new RadioStationService(radioConfig, playlist, player, speaker, trayManager, library, announcementEngine);
-        service.start();
+        // 6. Servizio Radio (Il coordinatore)
+        service = new RadioStationService(config, playlist, player, speaker, trayManager, library, announcementEngine);
+    }
 
-        trayManager.addMenuItem("Richiesta", e -> SwingUtilities.invokeLater(() -> {
-            RequestDialog dlg = new RequestDialog(library, service);
-            dlg.setVisible(true);
-        }));
-
-        boolean enableHotKeys = radioConfig.get("main", "enableHotKeys", "true").equalsIgnoreCase("true");
+    /**
+     * Configura le HotKeys globali e il relativo shutdown hook.
+     */
+    private static void setupHotKeys() throws CTException {
+        boolean enableHotKeys = config.get("main", "enableHotKeys", "true").equalsIgnoreCase("true");
         if (enableHotKeys) {
-            GlobalHotkeyManager hotkeyManager = new GlobalHotkeyManager(service, radioConfig);
+            final GlobalHotkeyManager hotkeyManager = new GlobalHotkeyManager(service, config);
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("Chiusura dell'applicazione, rimozione hot key e shutdown servizio");
-                hotkeyManager.shutdown();
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    logger.info("Chiusura dell'applicazione, rimozione hot key e shutdown servizio");
+                    hotkeyManager.shutdown();
+                }
             }));
         }
+    }
 
-        try {
-            Thread.currentThread().join();          // blocca il thread principale
-        } catch (InterruptedException e) {
-            // Interruzione provvisoria: procede con la chiusura
-            Thread.currentThread().interrupt();
-        }
+    /**
+     * Aggiunge le voci di menu alla System Tray utilizzando classi anonime (no
+     * lambda).
+     */
+    public static void addSystemTrayMenu() {
+        // Volume +
+        trayManager.addMenuItem("Volume +", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                try {
+                    service.increaseVolume();
+                } catch (CTException ex) {
+                    logger.error("Errore volume+", ex);
+                }
+            }
+        });
+
+        // Volume -
+        trayManager.addMenuItem("Volume -", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                try {
+                    service.decreaseVolume();
+                } catch (CTException ex) {
+                    logger.error("Errore volume-", ex);
+                }
+            }
+        });
+
+        trayManager.addMenuItem("--------------------", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+            }
+        });
+
+        // Playback
+        trayManager.addMenuItem("Brano Successivo", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.nextTrack();
+            }
+        });
+
+        trayManager.addMenuItem("Brano Precedente", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.previousTrack();
+            }
+        });
+
+        trayManager.addMenuItem("Pausa / Riprendi", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.togglePause();
+            }
+        });
+
+        trayManager.addMenuItem("Richiesta", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        RequestDialog dlg = new RequestDialog(library, service);
+                        dlg.setVisible(true);
+                    }
+                });
+            }
+        });
+
+        trayManager.addMenuItem("--------------------", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+            }
+        });
+
+        // Annunci Forzati
+        trayManager.addMenuItem("Forza Meteo", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.forceWeather();
+            }
+        });
+
+        trayManager.addMenuItem("Forza Info Artista", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.forceArtistInfo();
+            }
+        });
+
+        trayManager.addMenuItem("Forza News", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.forceNews();
+            }
+        });
+
+        trayManager.addMenuItem("Informazioni", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                service.info();
+            }
+        });
+
+        trayManager.addMenuItem("--------------------", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+            }
+        });
+
+        // Esci
+        trayManager.addMenuItem("Esci", new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                logger.info("Richiesta di chiusura dalla TrayIcon");
+                System.exit(0);
+            }
+        });
     }
 }
