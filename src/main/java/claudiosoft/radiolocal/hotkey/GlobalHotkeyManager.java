@@ -3,7 +3,7 @@ package claudiosoft.radiolocal.hotkey;
 import claudiosoft.commons.BasicLogger;
 import claudiosoft.commons.CTException;
 import claudiosoft.commons.Config;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import claudiosoft.radiolocal.service.RadioStationService;
 import com.github.kwhat.jnativehook.GlobalScreen;
 import com.github.kwhat.jnativehook.NativeHookException;
@@ -16,7 +16,7 @@ import java.util.logging.Level;
  */
 public class GlobalHotkeyManager implements NativeKeyListener {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
     private final RadioStationService service;
 
     /* --------------------------------------------------------------

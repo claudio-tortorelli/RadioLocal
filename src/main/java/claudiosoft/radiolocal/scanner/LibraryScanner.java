@@ -1,7 +1,7 @@
 package claudiosoft.radiolocal.scanner;
 
 import claudiosoft.commons.BasicLogger;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import claudiosoft.radiolocal.model.Album;
 import claudiosoft.radiolocal.model.Artist;
 import claudiosoft.radiolocal.model.Library;
@@ -32,7 +32,7 @@ import org.jaudiotagger.tag.FieldKey;
  */
 public class LibraryScanner {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
     private final Path root;               // cartella da scansire
     private final Path dbFile;             // <root>/library.db
 

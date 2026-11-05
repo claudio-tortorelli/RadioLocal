@@ -3,7 +3,7 @@ package claudiosoft.radiolocal.service;
 import claudiosoft.commons.BasicLogger;
 import claudiosoft.commons.CTException;
 import claudiosoft.commons.Config;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import claudiosoft.radiolocal.model.Library;
 import claudiosoft.radiolocal.model.Track;
 import claudiosoft.radiolocal.player.AudioPlayer;
@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class RadioStationService {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
 
     private final Config config;
     private final PlaylistManager playlist;

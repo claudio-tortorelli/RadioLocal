@@ -3,7 +3,7 @@ package claudiosoft.radiolocal.speaker;
 import claudiosoft.commons.BasicLogger;
 import claudiosoft.commons.CTException;
 import claudiosoft.commons.Config;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import claudiosoft.radiolocal.model.Track;
 import claudiosoft.radiolocal.player.AudioPlayer;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import java.util.concurrent.*;
  */
 public class EspeakSpeaker implements SpeakerEngine {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
 
     private final AudioPlayer player;
     private final ExecutorService executor;

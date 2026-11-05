@@ -36,6 +36,8 @@ import marytts.exceptions.MaryConfigurationException;
  */
 public class RadioLocal {
 
+    public static BasicLogger logger;
+
     public static void main(String[] args) throws CTException, IOException, SQLException, MaryConfigurationException {
 
         System.setProperty("java.awt.headless", "false");
@@ -44,7 +46,7 @@ public class RadioLocal {
 
         File logFile = new File(radioConfig.get("logger", "file", "radiolocal.log"));
         LogLevel logLevel = LogLevel.valueOf(radioConfig.get("logger", "level", "NORMAL"));
-        Radio.logger = BasicLogger.get(logLevel, "RadioLocal", logFile);
+        logger = BasicLogger.get(logLevel, "RadioLocal", logFile);
 
         Path rootPath = new File(radioConfig.get("main", "root")).toPath();
         LibraryScanner scanner = new LibraryScanner(rootPath);
@@ -112,7 +114,7 @@ public class RadioLocal {
             GlobalHotkeyManager hotkeyManager = new GlobalHotkeyManager(service, radioConfig);
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                Radio.logger.info("Chiusura dell'applicazione, rimozione hot key e shutdown servizio");
+                logger.info("Chiusura dell'applicazione, rimozione hot key e shutdown servizio");
                 hotkeyManager.shutdown();
             }));
         }

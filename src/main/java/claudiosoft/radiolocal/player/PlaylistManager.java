@@ -1,7 +1,7 @@
 package claudiosoft.radiolocal.player;
 
 import claudiosoft.commons.BasicLogger;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import claudiosoft.radiolocal.model.Track;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,7 +12,7 @@ import java.util.List;
  */
 public class PlaylistManager {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
 
     private final List<Track> source;
     private List<Track> shuffled;

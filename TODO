@@ -1,0 +1,43 @@
+todo
+-----------
+speaker ollama
+
+coda riproduzione su file log separato
+
+provider implementati sempre da ollama con modello locale
+
+pubblicità simulate
+
+richieste alla radio
+
+da conf disabilitare tutti gli hot keys
+
+salvare il path assoluto del brano sul log
+
+inserire regole per il parsing: spazi, accenti ecc. non devono influire sul
+ nome degli artisti, accorpare
+
+aggiungere tutti i comandi hotkeys a menu
+
+aggiungere brano corrente come preferito oppure fornire voto 1-10
+
+richiamare previsioni tempo o news in modo forzato
+
+gestione eccezioni e eccezioni startup (es. root non presente, brano non
+ trovato)
+
+gestione dei jingle con un jingle provider
+
+interfaccia web per lo stream
+
+app app android per sentire lo stream
+
+memorizzazione dello stato di conf e playlist alla chiusura
+
+meteo con provider su parsing arezzo meteo
+
+skip per annuncio se certi brani sono incompleti
+
+utilizzo dei modelli ollama parlati
+
+editor di classificazione delle canzoni a db

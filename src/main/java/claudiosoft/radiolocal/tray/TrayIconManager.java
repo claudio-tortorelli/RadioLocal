@@ -1,7 +1,7 @@
 package claudiosoft.radiolocal.tray;
 
 import claudiosoft.commons.BasicLogger;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import java.awt.*;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
@@ -27,7 +27,7 @@ import javax.imageio.ImageIO;
  */
 public class TrayIconManager {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
 
     private final TrayIcon trayIcon;      // null se il platform non lo supporta
     private final SystemTray systemTray;  // null se non supportato

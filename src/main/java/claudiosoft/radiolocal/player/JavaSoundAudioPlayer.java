@@ -1,7 +1,7 @@
 package claudiosoft.radiolocal.player;
 
 import claudiosoft.commons.BasicLogger;
-import claudiosoft.radiolocal.Radio;
+import claudiosoft.radiolocal.RadioLocal;
 import claudiosoft.radiolocal.model.Track;
 import java.io.File;
 import java.io.IOException;
@@ -11,7 +11,7 @@ import javax.sound.sampled.*;
 
 public class JavaSoundAudioPlayer implements AudioPlayer {
 
-    private static final BasicLogger LOG = Radio.logger;
+    private static final BasicLogger LOG = RadioLocal.logger;
 
     /* ---------- Stato di riproduzione ---------- */
     private volatile Thread playbackThread;
