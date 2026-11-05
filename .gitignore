@@ -25,3 +25,5 @@ replay_pid*
 /target/
 radiolocal.log.lck
 radiolocal.cfg
+nbactions.xml
+nb-configuration.xml
