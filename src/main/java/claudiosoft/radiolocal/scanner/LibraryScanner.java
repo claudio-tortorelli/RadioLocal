@@ -6,8 +6,7 @@ import claudiosoft.radiolocal.model.Album;
 import claudiosoft.radiolocal.model.Artist;
 import claudiosoft.radiolocal.model.Library;
 import claudiosoft.radiolocal.model.Track;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.*;
@@ -20,42 +19,22 @@ import org.jaudiotagger.tag.FieldKey;
 
 /**
  * Scansiona una directory, popola una {@link Library} e la persiste su SQLite.
- *
- * <p>
- * Il concetto di “forced scan” permette di rinfrescare la libreria (o di
- * crearla la prima volta) mentre la modalità di default legge la struttura già
- * salvata, evitando costosi I/O su filesystem.</p>
- *
- * <p>
- * Le lambda expression sono state eliminate a favore di strutture tradizionali
- * (for‑loop, SimpleFileVisitor, ecc.).</p>
+ * Utilizza path relativi nel DB per permettere lo spostamento della cartella
+ * root. Implementa un sistema di fallback per i metadati: Tag ID3 -> Path
+ * Inference.
  */
 public class LibraryScanner {
 
     private static final BasicLogger LOG = RadioLocal.logger;
     private final Path root;               // cartella da scansire
     private final Path dbFile;             // <root>/library.db
+    private PrintWriter exceptionsWriter;   // file per i brani incompleti
 
-    /**
-     * Costruttore.
-     *
-     * @param root
-     */
     public LibraryScanner(Path root) {
         this.root = root;
         this.dbFile = root.resolve("library.db");
     }
 
-    /**
-     * Ritorna la libreria, scegliendo la modalità di operazione.
-     *
-     * @param forced se {@code true} forza una scansione del file‑system (oppure
-     * se il DB non esiste); se {@code false} carica la libreria dal DB se
-     * presente.
-     * @return la {@link Library} pronta all’uso
-     * @throws IOException se fallisce la lettura dei file audio
-     * @throws SQLException se falliscono le operazioni su SQLite
-     */
     public Library scan() throws IOException, SQLException {
         return scan(false);
     }
@@ -63,10 +42,20 @@ public class LibraryScanner {
     public Library scan(boolean forced) throws IOException, SQLException {
         if (forced || !Files.exists(dbFile)) {
             LOG.info("Forced scan avviata – la libreria sarà ricostruita da zero");
+
+            // Inizializzazione file eccezioni
+            setupExceptionsFile();
+
             Library lib = new Library();
             scanFileSystem(lib);
+
+            if (exceptionsWriter != null) {
+                exceptionsWriter.close();
+            }
+
             LOG.info("Scansione terminata: %d artisti, %d tracce"
                     .formatted(lib.getArtists().size(), lib.getAllTracks().size()));
+
             persistLibrary(lib);
             return lib;
         } else {
@@ -75,14 +64,17 @@ public class LibraryScanner {
         }
     }
 
-    /* ---------------------------------------------------------------
-       1)  SCANSIONE DEL FILE‑SYSTEM (senza lambda)
-       --------------------------------------------------------------- */
+    private void setupExceptionsFile() throws IOException {
+        File excFile = root.resolve("libraryScanExceptions.txt").toFile();
+        // Sovrascrive il file ad ogni forced scan
+        this.exceptionsWriter = new PrintWriter(new BufferedWriter(new FileWriter(excFile, false)));
+    }
+
     private void scanFileSystem(Library lib) throws IOException {
         Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                if (!attrs.isDirectory() && hasAudioExtension(file)) {
+                if (hasAudioExtension(file)) {
                     processFile(file, lib);
                 }
                 return FileVisitResult.CONTINUE;
@@ -96,131 +88,138 @@ public class LibraryScanner {
         });
     }
 
-    /**
-     * Verifica se il nome di un file termina con .mp3 o .ogg
-     * (case‑insensitive).
-     */
+    private void processFile(Path curPath, Library lib) {
+        String title = null;
+        String artist = null;
+        String album = null;
+        int duration = 0;
+
+        // --- STEP 1: Prova con jaudiotagger ---
+        try {
+            AudioFile af = AudioFileIO.read(curPath.toFile());
+            org.jaudiotagger.tag.Tag tag = af.getTag();
+            if (tag != null) {
+                title = getTagValue(tag, FieldKey.TITLE);
+                artist = getTagValue(tag, FieldKey.ARTIST);
+                album = getTagValue(tag, FieldKey.ALBUM);
+            }
+            duration = (int) af.getAudioHeader().getTrackLength();
+        } catch (Exception e) {
+            LOG.debug("Tagging fallito per %s, provo inferenza da path".formatted(curPath.getFileName()));
+        }
+
+        // --- STEP 2: Fallback su Path Inference ---
+        // Path relativo: Letter/Artist/Album/title.mp3 (nameCount=4) oppure Letter/Artist/title.mp3 (nameCount=3)
+        Path relativePath = root.relativize(curPath);
+        int nameCount = relativePath.getNameCount();
+
+        if (artist == null || artist.isBlank()) {
+            if (nameCount >= 2) {
+                artist = relativePath.getName(1).toString();
+            }
+        }
+
+        if (album == null || album.isBlank()) {
+            // L'album è presente solo se ci sono 4 elementi (Lettera, Artista, Album, File)
+            if (nameCount == 4) {
+                album = relativePath.getName(2).toString();
+            }
+        }
+
+        if (title == null || title.isBlank()) {
+            String filename = curPath.getFileName().toString();
+            int lastDot = filename.lastIndexOf('.');
+            title = (lastDot != -1) ? filename.substring(0, lastDot) : filename;
+        }
+
+        // --- STEP 3: Normalizzazione e Valori di Default ---
+        artist = cleanValue(artist, "unknownArtist");
+        album = cleanValue(album, "unknownAlbum");
+        title = cleanValue(title, "unknownTitle");
+
+        // Log delle eccezioni se mancano informazioni
+        logMetadataExceptions(curPath, artist, album, title);
+
+        // --- STEP 4: Inserimento in Library ---
+        Artist art = lib.getOrCreateArtist(artist);
+
+        Album alb = null;
+        List<Album> artistAlbums = art.getAlbums();
+        for (Album existing : artistAlbums) {
+            if (existing.getName().equalsIgnoreCase(album)) {
+                alb = existing;
+                break;
+            }
+        }
+        if (alb == null) {
+            alb = new Album(album, art);
+            art.addAlbum(alb);
+        }
+
+        Track track = new Track(curPath.toFile(), title, artist, album, duration);
+        alb.addTrack(track);
+    }
+
+    private String getTagValue(org.jaudiotagger.tag.Tag tag, org.jaudiotagger.tag.FieldKey key) {
+        String val = tag.getFirst(key);
+        return (val == null) ? null : val.trim();
+    }
+
+    private String cleanValue(String val, String defaultValue) {
+        if (val == null) {
+            return defaultValue;
+        }
+        String trimmed = val.trim();
+        return trimmed.isEmpty() ? defaultValue : trimmed;
+    }
+
+    private void logMetadataExceptions(Path path, String art, String alb, String tit) {
+        if (exceptionsWriter == null) {
+            return;
+        }
+
+        if (art.equals("unknownArtist") || alb.equals("unknownAlbum") || tit.equals("unknownTitle")) {
+            exceptionsWriter.println("File: " + root.relativize(path).toString());
+            if (art.equals("unknownArtist")) {
+                exceptionsWriter.println("  -> missing artist");
+            }
+            if (alb.equals("unknownAlbum")) {
+                exceptionsWriter.println("  -> missing album");
+            }
+            if (tit.equals("unknownTitle")) {
+                exceptionsWriter.println("  -> missing title");
+            }
+            exceptionsWriter.println();
+        }
+    }
+
     private boolean hasAudioExtension(Path p) {
         String s = p.getFileName().toString().toLowerCase();
         return s.endsWith(".mp3") || s.endsWith(".ogg");
     }
 
-    /**
-     * Legge i metadati di un singolo file audio e lo inserisce nella Library.
-     */
-    private void processFile(Path curPath, Library lib) {
-        try {
-            AudioFile af = AudioFileIO.read(curPath.toFile());
-            org.jaudiotagger.tag.Tag tag = af.getTag();
-
-            String title = (tag != null) ? tag.getFirst(FieldKey.TITLE) : inferTitleFromPath(curPath);
-            String artist = (tag != null) ? tag.getFirst(FieldKey.ARTIST) : inferArtistFromPath(curPath);
-            String album = (tag != null) ? tag.getFirst(FieldKey.ALBUM) : inferAlbumFromPath(curPath);
-            int duration = (int) af.getAudioHeader().getTrackLength();
-
-            //  ----  Costruzione della gerarchia Artist → Album → Track  ----
-            Artist art = lib.getOrCreateArtist(artist);
-
-            Album alb = null;
-            List<Album> artistAlbums = art.getAlbums();
-            for (Album existing : artistAlbums) {
-                if (existing.getName().equalsIgnoreCase(album)) {
-                    alb = existing;
-                    break;
-                }
-            }
-            if (alb == null) {
-                alb = new Album(album, art);
-                art.addAlbum(alb);
-            }
-
-            Track track = new Track(curPath.toFile(), title, artist, album, duration);
-            alb.addTrack(track);
-        } catch (Exception e) {
-            LOG.error("Impossibile leggere il file %s".formatted(curPath), e);
-        }
-    }
-
-    private String inferTitleFromPath(Path p) {
-        // /root/Letter/Artist/Album?/title.mp3 
-        String fileName = p.getFileName().toString();
-        String[] split = fileName.split("\\.(?=[^\\.]+$)");
-        return split[0];
-    }
-
-    private String inferArtistFromPath(Path p) {
-        // /root/Letter/Artist/Album?/title.mp3 
-        int nFolders = p.getNameCount() - 1;
-        for (int i = 0; i < nFolders; i++) {
-            if (p.getName(i).toString().length() == 1 && i < nFolders) {
-                return p.getName(i + 1).toString();
-            }
-        }
-        return "Artista sconosciuto";
-    }
-
-    private String inferAlbumFromPath(Path p) {
-        // /root/Letter/Artist/Album?/title.mp3 
-        int nFolders = p.getNameCount() - 1;
-        for (int i = 0; i < nFolders; i++) {
-            if (p.getName(i).toString().length() == 1 && i < nFolders - 2) {
-                return p.getName(i + 2).toString();
-            }
-        }
-        return "Album sconosciuto";
-    }
-
     /* ---------------------------------------------------------------
-       2)  PERSISTENZA SU SQLITE (senza lambda)
+       PERSISTENZA SQLITE
        --------------------------------------------------------------- */
-    /**
-     * Crea le tabelle, se non esistono già.
-     */
     private void initialiseDb(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("PRAGMA foreign_keys = ON;");
-            stmt.execute(
-                    "CREATE TABLE IF NOT EXISTS artist ("
-                    + "  id   INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    + "  name TEXT NOT NULL UNIQUE"
-                    + ");");
-            stmt.execute(
-                    "CREATE TABLE IF NOT EXISTS album ("
-                    + "  id        INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    + "  name      TEXT NOT NULL,"
-                    + "  artist_id INTEGER NOT NULL,"
-                    + "  UNIQUE(name, artist_id),"
-                    + "  FOREIGN KEY(artist_id) REFERENCES artist(id) ON DELETE CASCADE"
-                    + ");");
-            stmt.execute(
-                    "CREATE TABLE IF NOT EXISTS track ("
-                    + "  id        INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    + "  path      TEXT NOT NULL,"
-                    + "  title     TEXT,"
-                    + "  duration  INTEGER,"
-                    + "  album_id  INTEGER NOT NULL,"
-                    + "  FOREIGN KEY(album_id) REFERENCES album(id) ON DELETE CASCADE"
-                    + ");");
+            stmt.execute("CREATE TABLE IF NOT EXISTS artist (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS album (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, artist_id INTEGER NOT NULL, UNIQUE(name, artist_id), FOREIGN KEY(artist_id) REFERENCES artist(id) ON DELETE CASCADE);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS track (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL, title TEXT, duration INTEGER, album_id INTEGER NOT NULL, FOREIGN KEY(album_id) REFERENCES album(id) ON DELETE CASCADE);");
         }
     }
 
-    /**
-     * Salva l’intera Library nel file SQLite.
-     */
     private void persistLibrary(Library lib) throws SQLException {
-        // Se esiste un DB vecchio lo sovrascriviamo (contenuto completamente ricostruito)
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toString())) {
             conn.setAutoCommit(false);
             initialiseDb(conn);
 
-            // Mappa nome artista → id (per evitare query ripetute)
             Map<String, Long> artistIdMap = new HashMap<>();
 
-            // 1) Inserimento artisti
+            // 1) Artisti
             String insertArtistSql = "INSERT INTO artist(name) VALUES(?)";
-            try (PreparedStatement insertArtist = conn.prepareStatement(insertArtistSql,
-                    Statement.RETURN_GENERATED_KEYS); PreparedStatement selectArtist = conn.prepareStatement(
-                            "SELECT id FROM artist WHERE name = ?")) {
+            try (PreparedStatement insertArtist = conn.prepareStatement(insertArtistSql, Statement.RETURN_GENERATED_KEYS); PreparedStatement selectArtist = conn.prepareStatement("SELECT id FROM artist WHERE name = ?")) {
 
                 for (Artist artist : lib.getArtists()) {
                     Long aId = findArtistId(selectArtist, artist.getName());
@@ -237,17 +236,14 @@ public class LibraryScanner {
                 }
             }
 
-            // 2) Inserimento album
+            // 2) Album
             String insertAlbumSql = "INSERT INTO album(name, artist_id) VALUES(?,?)";
-            Map<String, Long> albumIdMap = new HashMap<>(); // chiave: artistId|albumName
-            try (PreparedStatement insertAlbum = conn.prepareStatement(insertAlbumSql,
-                    Statement.RETURN_GENERATED_KEYS); PreparedStatement selectAlbum = conn.prepareStatement(
-                            "SELECT id FROM album WHERE name = ? AND artist_id = ?")) {
+            Map<String, Long> albumIdMap = new HashMap<>();
+            try (PreparedStatement insertAlbum = conn.prepareStatement(insertAlbumSql, Statement.RETURN_GENERATED_KEYS); PreparedStatement selectAlbum = conn.prepareStatement("SELECT id FROM album WHERE name = ? AND artist_id = ?")) {
 
                 for (Artist artist : lib.getArtists()) {
                     Long aId = artistIdMap.get(artist.getName());
                     for (Album album : artist.getAlbums()) {
-                        String key = aId + "|" + album.getName();
                         Long alId = findAlbumId(selectAlbum, album.getName(), aId);
                         if (alId == null) {
                             insertAlbum.setString(1, album.getName());
@@ -259,22 +255,22 @@ public class LibraryScanner {
                                 }
                             }
                         }
-                        albumIdMap.put(key, alId);
+                        albumIdMap.put(aId + "|" + album.getName(), alId);
                     }
                 }
             }
 
-            // 3) Inserimento tracce
+            // 3) Tracce (SALVATAGGIO PATH RELATIVO)
             String insertTrackSql = "INSERT INTO track(path, title, duration, album_id) VALUES(?,?,?,?)";
             try (PreparedStatement insertTrack = conn.prepareStatement(insertTrackSql)) {
-
                 for (Artist artist : lib.getArtists()) {
                     Long aId = artistIdMap.get(artist.getName());
                     for (Album album : artist.getAlbums()) {
-                        String key = aId + "|" + album.getName();
-                        Long alId = albumIdMap.get(key);
+                        Long alId = albumIdMap.get(aId + "|" + album.getName());
                         for (Track track : album.getTracks()) {
-                            insertTrack.setString(1, track.getFile().getAbsolutePath());
+                            // Calcolo path relativo alla root
+                            String relPath = root.relativize(track.getFile().toPath()).toString();
+                            insertTrack.setString(1, relPath);
                             insertTrack.setString(2, track.getTitle());
                             insertTrack.setInt(3, track.getDurationSec());
                             insertTrack.setLong(4, alId);
@@ -284,16 +280,11 @@ public class LibraryScanner {
                 }
                 insertTrack.executeBatch();
             }
-
             conn.commit();
-            LOG.info("Library salvata su SQLite: %s".formatted(dbFile));
+            LOG.info("Library salvata su SQLite (path relativi): %s".formatted(dbFile));
         }
     }
 
-    /**
-     * Cerca l’id dell’artista dato il suo nome; ritorna {@code null} se non
-     * trovato.
-     */
     private Long findArtistId(PreparedStatement stmt, String name) throws SQLException {
         stmt.setString(1, name);
         try (ResultSet rs = stmt.executeQuery()) {
@@ -304,10 +295,6 @@ public class LibraryScanner {
         return null;
     }
 
-    /**
-     * Cerca l’id dell’album dato nome + artist_id; ritorna {@code null} se non
-     * trovato.
-     */
     private Long findAlbumId(PreparedStatement stmt, String name, Long artistId) throws SQLException {
         stmt.setString(1, name);
         stmt.setLong(2, artistId);
@@ -319,75 +306,55 @@ public class LibraryScanner {
         return null;
     }
 
-    /**
-     * Carica l’intera Library dal file SQLite.
-     */
     private Library loadFromDb() throws SQLException {
         Library lib = new Library();
-
         if (!Files.exists(dbFile)) {
-            LOG.warn("DB non trovato: %s – ritorna una library vuota".formatted(dbFile));
             return lib;
         }
 
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toString())) {
-            initialiseDb(conn);   // garantisce che le tabelle esistano
+            initialiseDb(conn);
 
-            // 1) Caricamento artisti
             Map<Long, Artist> artistById = new HashMap<>();
             try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT id, name FROM artist")) {
                 while (rs.next()) {
                     long id = rs.getLong("id");
-                    String name = rs.getString("name");
-                    Artist artist = lib.getOrCreateArtist(name);
+                    Artist artist = lib.getOrCreateArtist(rs.getString("name"));
                     artistById.put(id, artist);
                 }
             }
 
-            // 2) Caricamento album
             Map<Long, Album> albumById = new HashMap<>();
             try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT id, name, artist_id FROM album")) {
                 while (rs.next()) {
                     long id = rs.getLong("id");
                     String name = rs.getString("name");
-                    long artistId = rs.getLong("artist_id");
-                    Artist artist = artistById.get(artistId);
-                    if (artist == null) {
-                        LOG.warn("Album con artist_id %d non trovato – lo salto".formatted(artistId));
-                        continue;
+                    Artist artist = artistById.get(rs.getLong("artist_id"));
+                    if (artist != null) {
+                        Album album = new Album(name, artist);
+                        artist.addAlbum(album);
+                        albumById.put(id, album);
                     }
-                    Album album = new Album(name, artist);
-                    artist.addAlbum(album);
-                    albumById.put(id, album);
                 }
             }
 
-            // 3) Caricamento tracce
-            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
-                    "SELECT path, title, duration, album_id FROM track")) {
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery("SELECT path, title, duration, album_id FROM track")) {
                 while (rs.next()) {
-                    String pathStr = rs.getString("path");
+                    String relPath = rs.getString("path");
+                    // RICOSTRUZIONE PATH ASSOLUTO
+                    File file = root.resolve(relPath).toFile();
                     String title = rs.getString("title");
                     int duration = rs.getInt("duration");
-                    long albumId = rs.getLong("album_id");
+                    Album album = albumById.get(rs.getLong("album_id"));
 
-                    Album album = albumById.get(albumId);
-                    if (album == null) {
-                        LOG.warn("Track con album_id %d non trovato – lo salto".formatted(albumId));
-                        continue;
+                    if (album != null) {
+                        Track track = new Track(file, title, album.getArtist().getName(), album.getName(), duration);
+                        album.addTrack(track);
                     }
-
-                    Artist artist = album.getArtist();          // assumiamo getter getArtist()
-                    String artistName = artist.getName();      // e getName()
-                    String albumName = album.getName();
-
-                    Track track = new Track(new File(pathStr), title, artistName, albumName, duration);
-                    album.addTrack(track);
                 }
             }
         }
-
-        LOG.info("Library caricata da SQLite: %d artisti, %d tracce"
+        LOG.info("Library caricata dal DB (path ripristinati): %d artisti, %d tracce"
                 .formatted(lib.getArtists().size(), lib.getAllTracks().size()));
         return lib;
     }

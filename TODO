@@ -12,14 +12,9 @@ richieste alla radio
 
 pianificazione palinsesto, con orario calcolato per le trasmissioni
 
-da conf disabilitare tutti gli hot keys
-
 salvare il path assoluto del brano sul log
 
-inserire regole per il parsing: spazi, accenti ecc. non devono influire sul
- nome degli artisti, accorpare
-
-aggiungere tutti i comandi hotkeys a menu
+se in fase di play mancano informazioni, andare a integrarle durante la play su internet
 
 aggiungere brano corrente come preferito oppure fornire voto 1-10
 

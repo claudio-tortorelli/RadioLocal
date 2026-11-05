@@ -7,16 +7,22 @@ public final class Library {
     private final Map<String, Artist> artists = new HashMap<>();
 
     public Artist getOrCreateArtist(String name) {
-        return artists.computeIfAbsent(name, Artist::new);
+        String normalized = normalize(name);
+        return artists.computeIfAbsent(normalized, k -> new Artist(name));
+    }
+
+    private String normalize(String input) {
+        if (input == null) {
+            return "unknownArtist";
+        }
+        String trimmed = input.trim();
+        return trimmed.isEmpty() ? "unknownArtist" : trimmed.toLowerCase(Locale.ROOT);
     }
 
     public Collection<Artist> getArtists() {
         return Collections.unmodifiableCollection(artists.values());
     }
 
-    /**
-     * Restituisce tutti i brani (flatten) per costruire la playlist
-     */
     public List<Track> getAllTracks() {
         List<Track> result = new ArrayList<>();
         for (Artist a : artists.values()) {
@@ -27,20 +33,27 @@ public final class Library {
         return result;
     }
 
-    /**
-     * Restituisce tutti i brani dell’artista indicato (case‑insensitive).
-     */
     public List<Track> getTracksByArtist(String artistName) {
-        for (Artist a : artists.values()) {
-            if (a.getName().equalsIgnoreCase(artistName)) {
-                List<Track> list = new ArrayList<>();
-                for (Album al : a.getAlbums()) {
-                    list.addAll(al.getTracks());
-                }
-                return list;
-            }
+        String normalized = normalize(artistName);
+        Artist a = artists.get(normalized);
+        if (a == null) {
+            return Collections.emptyList();
         }
-        return Collections.emptyList();
+
+        List<Track> list = new ArrayList<>();
+        for (Album al : a.getAlbums()) {
+            list.addAll(al.getTracks());
+        }
+        return list;
+    }
+
+    public List<String> getArtistNames() {
+        List<String> names = new ArrayList<>();
+        for (Artist a : artists.values()) {
+            names.add(a.getName());
+        }
+        Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+        return names;
     }
 
     /**
@@ -60,17 +73,5 @@ public final class Library {
             }
         }
         return list;
-    }
-
-    /**
-     * Restituisce i nomi di tutti gli artisti (ordinati).
-     */
-    public List<String> getArtistNames() {
-        List<String> names = new ArrayList<>();
-        for (Artist a : artists.values()) {
-            names.add(a.getName());
-        }
-        Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
-        return names;
     }
 }
