@@ -38,3 +38,5 @@ skip per annuncio se certi brani sono incompleti
 utilizzo dei modelli ollama parlati
 
 editor di classificazione delle canzoni a db
+
+non dovrebbe eseguire solo le canzoni sequenzialmente shuffled, o meglio, ogni tot dovrebbe eseguire un nuovo shuffle 
