@@ -8,8 +8,6 @@ provider implementati sempre da ollama con modello locale
 
 pubblicità simulate
 
-richieste alla radio
-
 pianificazione palinsesto, con orario calcolato per le trasmissioni
 
 salvare il path assoluto del brano sul log
@@ -32,8 +30,6 @@ app app android per sentire lo stream
 memorizzazione dello stato di conf e playlist alla chiusura
 
 meteo con provider su parsing arezzo meteo
-
-skip per annuncio se certi brani sono incompleti
 
 utilizzo dei modelli ollama parlati
 

@@ -13,6 +13,7 @@ import claudiosoft.radiolocal.speaker.announcement.*;
 import claudiosoft.radiolocal.tray.TrayIconManager;
 import java.awt.EventQueue;
 import java.awt.TrayIcon;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -118,6 +119,8 @@ public class RadioStationService {
                     showBalloon(track);
                 } catch (CTException ex) {
 
+                } catch (IOException ex) {
+
                 }
 
                 LOG.info("-- RIPRODOTTO: %s | %s (%s)".formatted(track.getArtist(), track.getTitle(), track.getAlbum()));
@@ -155,16 +158,36 @@ public class RadioStationService {
     }
 
     /* ------------------- UI Tray ------------------- */
-    private void showBalloon(Track track) throws CTException {
+    private void showBalloon(Track track) throws CTException, IOException {
         boolean show = config.get("main", "showBalloon", "true").equalsIgnoreCase("true");
         if (!show) {
             return;
         }
         if (tray != null) {
-            final String title = track.getTitle();
-            final String msg = "Artist: " + track.getArtist();
-            EventQueue.invokeLater(()
-                    -> tray.displayMessage(title, msg, TrayIcon.MessageType.INFO));
+            // 1. Se il brano è marcato come ignoto, skippa tutto
+            if (track.isIsUnknown()) {
+                return;
+            }
+
+            // 2. Se titolo = nome file o artista è ignoto, non includere i dati incompleti
+            String filePath = track.getFile().getCanonicalPath();
+            int lastDot = filePath.lastIndexOf('.');
+            String fileNameWithoutExt = (lastDot != -1) ? filePath.substring(0, lastDot) : filePath;
+
+            boolean isTitleFromFileName = track.getTitle().equals(fileNameWithoutExt);
+            boolean isArtistUnknown = (track.getArtist() == null || track.getArtist().isBlank());
+
+            if (isTitleFromFileName && isArtistUnknown) {
+                return; // Troppi dati mancanti, non mostrare nulla
+            }
+
+            String title = isTitleFromFileName ? "Brano in riproduzione" : track.getTitle();
+            String msg = isArtistUnknown ? "" : "Artista: " + track.getArtist();
+
+            if (msg.isEmpty()) {
+                return; // Non mostrare balloon vuoti
+            }
+            EventQueue.invokeLater(() -> tray.displayMessage(title, msg, TrayIcon.MessageType.INFO));
         }
     }
 
@@ -219,6 +242,8 @@ public class RadioStationService {
         try {
             showBalloon(player.getCurrentTrack());
         } catch (CTException ex) {
+            LOG.error(ex.getMessage(), ex);
+        } catch (IOException ex) {
             LOG.error(ex.getMessage(), ex);
         }
     }
