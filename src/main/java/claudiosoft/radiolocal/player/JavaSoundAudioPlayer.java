@@ -23,7 +23,6 @@ public class JavaSoundAudioPlayer implements AudioPlayer {
     private final AtomicReference<SourceDataLine> activeLine = new AtomicReference<>(null);
 
     private Track currentTrack;
-    private Track previousTrack;
 
     /* ==============================================================
        PUBLIC API
@@ -41,7 +40,6 @@ public class JavaSoundAudioPlayer implements AudioPlayer {
             return;
         }
 
-        previousTrack = currentTrack;
         currentTrack = track;
 
         // Ferma eventuale riproduzione in corso
@@ -154,6 +152,11 @@ public class JavaSoundAudioPlayer implements AudioPlayer {
     public void pause() {
         paused.set(true);
         LOG.debug("Playback in pausa");
+    }
+
+    @Override
+    public Track getCurrentTrack() {
+        return currentTrack;
     }
 
     @Override

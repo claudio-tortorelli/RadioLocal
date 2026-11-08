@@ -17,4 +17,6 @@ public interface AudioPlayer {
     boolean isPlaying();
 
     void resume();
+
+    Track getCurrentTrack();
 }

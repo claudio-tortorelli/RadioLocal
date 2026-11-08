@@ -53,8 +53,7 @@ public class LibraryScanner {
                 exceptionsWriter.close();
             }
 
-            LOG.info("Scansione terminata: %d artisti, %d tracce"
-                    .formatted(lib.getArtists().size(), lib.getAllTracks().size()));
+            LOG.info("Scansione terminata: %d artisti, %d tracce".formatted(lib.getArtists().size(), lib.getAllTracks().size()));
 
             persistLibrary(lib);
             return lib;

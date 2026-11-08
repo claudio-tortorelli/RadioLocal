@@ -16,7 +16,6 @@ import java.awt.TrayIcon;
 import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -42,7 +41,6 @@ public class RadioStationService {
        ------------------------------------------------------------- */
     private final AtomicBoolean paused = new AtomicBoolean(false);
     private final AtomicReference<Track> forcedTrack = new AtomicReference<>(null);
-    private final AtomicLong lastEsc = new AtomicLong(0);
 
     /* ------------------- Costruttori ------------------- */
     // 1) costruttore legacy (senza tray e senza library)
@@ -218,7 +216,11 @@ public class RadioStationService {
     }
 
     public void info() {
-        // eventuali dati di stato da mostrare
+        try {
+            showBalloon(player.getCurrentTrack());
+        } catch (CTException ex) {
+            LOG.error(ex.getMessage(), ex);
+        }
     }
 
     public void forceWeather() {
