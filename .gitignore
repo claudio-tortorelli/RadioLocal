@@ -28,3 +28,5 @@ radiolocal.cfg
 nbactions.xml
 nb-configuration.xml
 AnalisiWeb.odt
+jre/
+dist/JNativeHook.x86_64.dll

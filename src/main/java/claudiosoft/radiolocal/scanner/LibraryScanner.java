@@ -44,7 +44,7 @@ public class LibraryScanner {
             LOG.info("Forced scan avviata – la libreria sarà ricostruita da zero");
 
             // Inizializzazione file eccezioni
-            setupExceptionsFile();
+            //setupExceptionsFile();
 
             Library lib = new Library();
             scanFileSystem(lib);
@@ -125,19 +125,22 @@ public class LibraryScanner {
             }
         }
 
+        boolean isUnknown = false;
         if (title == null || title.isBlank()) {
             String filename = curPath.getFileName().toString();
             int lastDot = filename.lastIndexOf('.');
             title = (lastDot != -1) ? filename.substring(0, lastDot) : filename;
+
+            isUnknown = (artist == null || artist.isBlank()) && (album == null || album.isBlank());
         }
 
         // --- STEP 3: Normalizzazione e Valori di Default ---
-        artist = cleanValue(artist, "unknownArtist");
-        album = cleanValue(album, "unknownAlbum");
-        title = cleanValue(title, "unknownTitle");
+        title = cleanMetadata(title, "unknown");
+        artist = cleanMetadata(artist, "unknown");
+        album = cleanMetadata(album, "unknown");
 
         // Log delle eccezioni se mancano informazioni
-        logMetadataExceptions(curPath, artist, album, title);
+        //logMetadataExceptions(curPath, artist, album, title);
 
         // --- STEP 4: Inserimento in Library ---
         Artist art = lib.getOrCreateArtist(artist);
@@ -156,6 +159,7 @@ public class LibraryScanner {
         }
 
         Track track = new Track(curPath.toFile(), title, artist, album, duration);
+        track.setUnknown(isUnknown);
         alb.addTrack(track);
     }
 
@@ -163,15 +167,7 @@ public class LibraryScanner {
         String val = tag.getFirst(key);
         return (val == null) ? null : val.trim();
     }
-
-    private String cleanValue(String val, String defaultValue) {
-        if (val == null) {
-            return defaultValue;
-        }
-        String trimmed = val.trim();
-        return trimmed.isEmpty() ? defaultValue : trimmed;
-    }
-
+    
     private void logMetadataExceptions(Path path, String art, String alb, String tit) {
         if (exceptionsWriter == null) {
             return;
@@ -356,5 +352,21 @@ public class LibraryScanner {
         LOG.info("Library caricata dal DB (path ripristinati): %d artisti, %d tracce"
                 .formatted(lib.getArtists().size(), lib.getAllTracks().size()));
         return lib;
+    }
+
+    private String cleanMetadata(String val, String defaultVal) {
+        if (val == null) {
+            return defaultVal;
+        }
+        // Rimuove caratteri speciali, punteggiatura e parentesi all'inizio e alla fine
+        val = val.trim().replaceAll("^[^a-zA-Z0-9\\s]+|[^a-zA-Z0-9\\s]+$", "");
+        val = val.replace("(", "");
+        val = val.replace("[", "");
+        val = val.replace(")", "");
+        val = val.replace("]", "");
+        if (val.isEmpty()) {
+            return defaultVal;
+        }
+        return val;
     }
 }

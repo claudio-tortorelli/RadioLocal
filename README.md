@@ -2,7 +2,6 @@
 
 Una piccola radio desktop con estensioni intelligenti, gestita via audio stream locale.
 
-**Versione:** 1.0.0-SNAPSHOT  
 **Lingua:** Italiano (predefinita per le impostazioni e le TTS)  
 **Licenza:** Proprietaria (claudiosoft)
 
@@ -115,6 +114,7 @@ volumeStep = 5
 enableSpeaker = true
 speakerType = marytts
 enableHotKeys = true
+showBalloon = true
 
 # -------------------------------------------------
 #  Logger
@@ -160,7 +160,7 @@ global_min_interval = 600
 #  Meteo (OpenWeatherMap)
 # -----------------------------------------------------------------
 [weather]
-enabled = true
+enabled = false
 location = Arezzo,IT          
 apiKey = ************
 interval = 3600

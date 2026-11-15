@@ -78,6 +78,11 @@ public class RadioStationService {
         if (track != null) {
             requestQueue.offer(track);
             LOG.info("Traccia richiesta aggiunta in coda: " + track);
+            try {
+                showBalloon(track, "Traccia richiesta aggiunta in coda: " + track.getTitle());
+            } catch (CTException ex) {
+
+            }
         }
     }
 
@@ -156,13 +161,23 @@ public class RadioStationService {
 
     /* ------------------- UI Tray ------------------- */
     private void showBalloon(Track track) throws CTException {
+        showBalloon(track, null);
+    }
+
+    private void showBalloon(Track track, String message) throws CTException {
         boolean show = config.get("main", "showBalloon", "true").equalsIgnoreCase("true");
         if (!show) {
             return;
         }
         if (tray != null) {
             final String title = track.getTitle();
-            final String msg = "Artist: " + track.getArtist();
+            final String msg;
+            if (message != null && !message.isEmpty()) {
+                msg = message;
+            } else {
+                msg = "Artist: " + track.getArtist();
+            }
+            
             EventQueue.invokeLater(()
                     -> tray.displayMessage(title, msg, TrayIcon.MessageType.INFO));
         }

@@ -10,6 +10,7 @@ public final class Track {
     private final String artist;
     private final String album;
     private final int durationSec;   // opzionale, 0 se ignoto
+    private boolean isUnknown = false;
 
     public Track(File file, String title, String artist, String album, int durationSec) {
         this.file = Objects.requireNonNull(file);
@@ -43,4 +44,13 @@ public final class Track {
     public String toString() {
         return String.format("%s – %s (%s)", artist, title, album);
     }
+
+    public boolean isUnknown() {
+        return isUnknown;
+    }
+
+    public void setUnknown(boolean unknown) {
+        this.isUnknown = unknown;
+    }
+
 }

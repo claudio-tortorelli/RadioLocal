@@ -42,3 +42,15 @@ editor di classificazione delle canzoni a db
 non dovrebbe eseguire solo le canzoni sequenzialmente shuffled, o meglio, ogni tot dovrebbe eseguire un nuovo shuffle
 
 ricerca per artista
+
+
+
+improvements db
+- i brani possono appartenere opzionalmente ad un album (relazione 0:n), può avere uno o più artisti (relazione 0:n) e sicuramente un titolo (relazione 1:1) che deve essere determinato nel caso peggiore dal titolo del file. Tuttavia se il titolo del brano è il nome del file e album e artista sono mancanti, il record deve essere marcato come ignoto.
+- sul db deve esserci anche un campo relativo al brano che identifica l'ultima data-ora in cui è stato riprodotto e il numero di volte che è stato riprodotto. Inoltre anche un campo che identifica lo score di preferenza da 1 a 5 e il genere musicale. Tutti questi campi aggiuntivi possono essere nulli inizialmente.
+- deve essere implementato un thread che verifica il prossimo brano della playlist e se i dati sul brano sono incompleti, ma non è ignoto, allora prova a completarli verificando informazioni sul web, se disponibili.
+- gli annunci e i balloon message non devono includere dati incompleti. Se titolo del brano manca (è il nome del file) o l'artista è ignoto, non devono essere inclusi. Se il brano è ignoto l'intero annuncio o balloon message deve essere skippato.
+- quando viene eseguita la scansione dei brani in libreria, dal nome del brano e dell'artista devono essere rimossi caratteri speciali iniziali e finali, come parentesi o punteggiatura.
+- un brano può essere raddoppiato perchè appartenente a più album o più artisti. Viceversa non dovrebbero essere duplicati di brani e artisti, che si intendono univoci. Al più un artista più apparire insieme ad altri artisti in uno o più brani.
+- il reperimento dei dati di un brano tramite path sul file system dovrebbe essere sempre l'ultima scelta. Occorre implementare se possibile un secondo livello di controllo dopo jaudiotagger per reperire le informazioni mancanti da metadati. Se possibile anche verificando tramite sistema operativo, o altra libreria, oppure una ricerca web. Valutare la presenza di qualche servizio web gratuito che possa eseguire il parsing del brano tramite upload e restituire le informazioni corrispondenti.
+- oltre al form di richiesta occorre implementare anche un form di modifica che consenta di editare e quindi aggiornare su db i dati di un brano. Eventualmente modificare il form di richiesta introducendo a quel livello anche un pulsante modifica.
