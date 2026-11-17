@@ -20,8 +20,7 @@ aggiungere brano corrente come preferito oppure fornire voto 1-10
 
 richiamare previsioni tempo o news in modo forzato
 
-gestione eccezioni e eccezioni startup (es. root non presente, brano non
- trovato)
+gestione eccezioni e eccezioni startup (es. root non presente, brano non trovato)
 
 gestione dei jingle con un jingle provider
 
@@ -41,7 +40,13 @@ editor di classificazione delle canzoni a db
 
 non dovrebbe eseguire solo le canzoni sequenzialmente shuffled, o meglio, ogni tot dovrebbe eseguire un nuovo shuffle
 
-ricerca per artista
+play per artista
+
+printare sul log, console e baloon anche la durata brano
+
+menù apri cartella brano 
+
+
 
 
 
