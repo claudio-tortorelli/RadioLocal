@@ -135,9 +135,9 @@ public class LibraryScanner {
         }
 
         // --- STEP 3: Normalizzazione e Valori di Default ---
-        title = cleanMetadata(title, "unknown");
-        artist = cleanMetadata(artist, "unknown");
-        album = cleanMetadata(album, "unknown");
+        title = cleanMetadata(title, "unknownTitle");
+        artist = cleanMetadata(artist, "unknownArtist");
+        album = cleanMetadata(album, "unknownAlbum");
 
         // Log delle eccezioni se mancano informazioni
         //logMetadataExceptions(curPath, artist, album, title);
@@ -190,7 +190,7 @@ public class LibraryScanner {
 
     private boolean hasAudioExtension(Path p) {
         String s = p.getFileName().toString().toLowerCase();
-        return s.endsWith(".mp3") || s.endsWith(".ogg");
+        return s.endsWith(".mp3") || s.endsWith(".ogg") || s.endsWith(".wav");
     }
 
     /* ---------------------------------------------------------------
