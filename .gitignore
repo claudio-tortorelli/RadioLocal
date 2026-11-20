@@ -30,3 +30,6 @@ nb-configuration.xml
 AnalisiWeb.odt
 jre/
 dist/JNativeHook.x86_64.dll
+downloads/
+resource/ffmpeg/
+resource/yt-dlp.exe
