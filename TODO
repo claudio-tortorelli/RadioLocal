@@ -53,16 +53,13 @@ Reindicizzazione forzata su canzoni aggiornate, aggiunta, modifica e rimozione
 Gestione del genere musicale o della raccolta
 
 Definizione del pattern delle cartelle custom da conf e non solo fisso
+    possibilità di definire un override sul path template con un file apposito e sintassi, dentro la cartella root
 
 App android e hosting anonimo
 
 Jingle e rradiolocal su suno o simile
 
-anche wav tra file riproducibili
-
-download automatico tutto https://hitparadeitalia.it/hp_yends/hpe1998.htm
-
-
+aprire e gestire più library
 
 
 improvements db
